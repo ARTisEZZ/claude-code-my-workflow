@@ -5,9 +5,19 @@
      Keep this file under ~150 lines — Claude loads it every session.
      See the guide at docs/workflow-guide.html for full documentation. -->
 
-**Project:** [YOUR PROJECT NAME]
-**Institution:** [YOUR INSTITUTION]
+**Project:** Малошумящий усилитель (МШУ) на GaN с коэффициентом шума менее 1 дБ
+**Type:** Диссертация + статьи (русский язык; статьи — английский)
+**Institution:** ТУСУР (Томский государственный университет систем управления и радиоэлектроники)
+**Author:** ARTisEZZ
 **Branch:** main
+
+## Предметная область
+
+- **Тема:** Малошумящий усилитель (МШУ) на GaN для СВЧ-диапазона, целевой NF < 1 дБ
+- **Направления:** СВЧ-электроника, микроэлектроника, полупроводниковые приборы
+- **Инструменты моделирования:** Comsol, Silvaco/Centaurus TCAD, ADS, CST Studio, Matlab, Mathcad, Excel
+- **Документооборот:** Word (основной), AutoCAD (чертежи), Figma (схемы/иллюстрации)
+- **Языки написания:** Диссертация — русский; статьи — английский
 
 ---
 
@@ -26,20 +36,26 @@ Cross-session context lives in [MEMORY.md](MEMORY.md); past plans, specs, and se
 ## Folder Structure
 
 ```
-[YOUR-PROJECT]/
-├── CLAUDE.MD                    # This file
-├── .claude/                     # Rules, skills, agents, hooks
-├── Bibliography_base.bib        # Centralized bibliography
-├── Figures/                     # Figures and images
-├── Preambles/header.tex         # LaTeX headers
-├── Slides/                      # Beamer .tex files
-├── Quarto/                      # RevealJS .qmd files + theme
-├── docs/                        # GitHub Pages (auto-generated)
-├── scripts/                     # Utility scripts + R code
-├── quality_reports/             # Plans, session logs, merge reports, decision records
-├── explorations/                # Research sandbox (see rules)
-├── templates/                   # Session log, quality report templates
-└── master_supporting_docs/      # Papers and existing slides
+C_C_disser/
+├── CLAUDE.md                    # Этот файл — читается каждую сессию
+├── MEMORY.md                    # Контекст между сессиями
+├── .claude/                     # Правила, скиллы, агенты, хуки
+├── Bibliography_base.bib        # Единая база библиографии (BibTeX)
+├── Figures/                     # Рисунки, графики, схемы
+│   ├── simulations/             # Графики из ADS, Comsol, CST
+│   ├── schematics/              # Принципиальные схемы
+│   └── photos/                  # Фото макетов и образцов
+├── Dissertation/                # Текст диссертации (Word / LaTeX)
+├── Articles/                    # Статьи (EN)
+│   ├── article_01_lna_gan/
+│   └── article_02_microelectronics/
+├── Slides/                      # Презентации (Beamer .tex)
+├── Quarto/                      # Веб-версии слайдов
+├── scripts/                     # Вспомогательные скрипты
+├── quality_reports/             # Планы, логи сессий, отчёты проверки
+├── explorations/                # Черновики и эксперименты
+├── master_supporting_docs/      # Источники, статьи для изучения
+└── templates/                   # Шаблоны документов ТУСУР
 ```
 
 ---
@@ -117,9 +133,17 @@ Stata (`/stata-replication`), R packages (`/r-package-check`), TikZ (`/extract-t
 
 ---
 
-## Current Project State
+## Текущее состояние проекта
 
-| Lecture | Beamer | Quarto | Key Content |
-| --- | --- | --- | --- |
-| HelloWorld *(sample — delete when ready)* | `HelloWorld.tex` | `HelloWorld.qmd` | Minimal deck to verify setup |
-| 1: [Topic] | `Lecture01_Topic.tex` | `Lecture1_Topic.qmd` | [Brief description] |
+| Документ | Статус | Описание |
+| --- | --- | --- |
+| Диссертация — Глава 1 | 🔲 Не начата | Обзор литературы по МШУ на GaN |
+| Диссертация — Глава 2 | 🔲 Не начата | Моделирование в Comsol / TCAD |
+| Статья 1 (EN) | 🔲 Не начата | LNA GaN, NF < 1 dB — основные результаты |
+| Статья 2 (EN) | 🔲 Не начата | Тема по микроэлектронике |
+
+## Ключевые технические параметры МШУ
+
+- Целевой коэффициент шума: **NF < 1 дБ**
+- Технология: **GaN HEMT**
+- Инструменты симуляции: Comsol, Silvaco TCAD, ADS, CST
