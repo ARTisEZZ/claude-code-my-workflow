@@ -19,17 +19,23 @@
   "краткое_содержание": "…",                          # 1–3 предложения, без режимов и рецептур
   "содержит_контролируемые": false,                   # КВЭК: содержатся ли сведения из списков
   "требуется_лицензия": false,                        # КВЭК: нужна ли лицензия ФСТЭК / разрешение Комиссии
+  "проверенные_пункты": [                             # КВЭК, обязательно, если что-то близко: пункты списков, под
+    "п. 3.5.3 «б» ПП РФ № 1299 (…порог или суть…): в материале …; не подпадает, так как …"
+  ],                                                  #   которые материал можно подтянуть, и почему он под них не подпадает
   "подразделение": "ЛМСТ",                            # ОП
   "издательство": "…", "город": "…", "страна": "…",   # ОП
   "год": "2026"
 }
 """
+import copy
 import json
 import re
 import sys
 from pathlib import Path
 
 import docx
+from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
 
 HERE = Path(__file__).resolve().parent
 T_KVEK = HERE / 'АКТ КВЭК (шаблон).docx'
@@ -128,6 +134,29 @@ def make_op_template():
     return T_OP
 
 
+def add_checked_items(p, items):
+    """После абзаца «подтверждаю, что … (не) содержится …» вставить пункты списков, под которые материал можно было
+    бы подтянуть, с обоснованием, почему он под них не подпадает (требование автора 02.10.2026). Оформление берётся
+    у этого абзаца: копия его pPr и свойств первого прогона."""
+    if not items:
+        return
+    head = 'Материал проверен на соответствие близким к нему по предмету пунктам списков.'
+    anchor = p._p
+    for text in [head] + [f'{i}) {s}' for i, s in enumerate(items, 1)]:
+        new = copy.deepcopy(p._p)
+        for child in list(new):
+            if child.tag != qn('w:pPr'):
+                new.remove(child)
+        r = copy.deepcopy(p.runs[0]._r)
+        for child in list(r):
+            if child.tag != qn('w:rPr'):
+                r.remove(child)
+        new.append(r)
+        anchor.addnext(new)
+        anchor = new
+        Paragraph(new, p._parent).runs[0].text = text
+
+
 def fill_kvek(f, out):
     d = docx.Document(T_KVEK)
     ps = list(paragraphs(d))
@@ -156,6 +185,7 @@ def fill_kvek(f, out):
         elif 'не содержится/содержится' in t:
             fill_plain(p, 'не содержится/содержится ' + choice,
                        'содержится' if f['содержит_контролируемые'] else 'не содержится')
+            add_checked_items(p, f.get('проверенные_пункты') or [])
         elif t.startswith('Заключение:'):
             fill_plain(p, '(название конференции, журнала и т.д.)', dest)
             fill_plain(p, 'не требуется/требуется ' + choice,
@@ -192,6 +222,7 @@ def selfcheck():
     f = dict(файл='тест', вид='статья', вид_ОП='статья в журнал', название='Методика X', авторы='Иванов А.Б.',
              издание='журнал «Y»', издание_для='журнала «Y»', краткое_содержание='Кратко.',
              содержит_контролируемые=False, требуется_лицензия=False, подразделение='ЛМСТ',
+             проверенные_пункты=['п. 9.9 ПП РФ № 1299 (порог 1 ГГц): в материале 2 ГГц; не подпадает, так как …'],
              издательство='ТУСУР', город='Томск', страна='Россия', год='2026')
     flat = lambda d: re.sub(r'\s+', ' ', '\n'.join(p.text for p in paragraphs(d)))
     with tempfile.TemporaryDirectory() as td:
@@ -201,6 +232,9 @@ def selfcheck():
                   'материалов для журнала «Y» не требуется оформление', '2026 г.', FIO):
             assert s in kt, s
         assert 'не содержится/содержится' not in kt and 'не требуется/требуется' not in kt
+        i_ok, i_head, i_item, i_end = (kt.index(s) for s in ('не содержится сведений', 'близким к нему по предмету',
+                                                             '1) п. 9.9 ПП РФ № 1299', 'Заключение:'))
+        assert i_ok < i_head < i_item < i_end, 'проверенные пункты — после «подтверждаю» и до «Заключения»'
         blank = flat(docx.Document(T_OP))
         for gone in ('Шумы AlGaN', 'Моховиков', 'Перин', 'Газизов', 'Комнатнов', 'ЛМСТ', 'Москва', 'обзорная'):
             assert gone not in blank, f'в пустом шаблоне ОП осталось «{gone}»'
