@@ -46,6 +46,7 @@ from pathlib import Path
 
 import docx
 from docx.oxml.ns import qn
+from docx.shared import Cm
 from docx.text.paragraph import Paragraph
 
 HERE = Path(__file__).resolve().parent
@@ -59,6 +60,51 @@ EXPERT = ('директор ИРЭТ', 'А.М. Заболоцкий')           
 HEAD_LMST = ('Зав. лаб. ЛМСТ', 'Е.С. Барбин')                 # КВЭК: «СОГЛАСОВАНО» при подаче от ЛМСТ
 COMMISSION = 'директор ИРЭТ Заболоцкий А.М., зав. каф. ТОР Рогожников Е.В., директор ПИШ Перин А.С.'
 COMMISSION_SIGN = ('А.М. Заболоцкий', 'Е.В. Рогожников', 'А.С. Перин')   # ОП: председатель, члены комиссии
+# Поля, см: левое, правое, верхнее, нижнее. В бланках ТУСУР поля узкие (КВЭК 1,75/1,5/0,75/0; ОП 1,9/0,9/0,9/0,9),
+# ГОСТ Р 7.0.97-2016 требует не менее 2/1/2/2 см; берётся обычный запас (автор, 07.10.2026).
+MARGINS_CM = (3.0, 1.5, 2.0, 2.0)
+SIGN_TAB_CM = 9.5                                  # ОП: начало «____ ФИО» в строках подписей
+KVEK_SIGN_TAB_CM = 8.5                             # КВЭК: должности короткие, длинным ФИО нужен запас
+
+
+def set_margins(d):
+    for s in d.sections:
+        s.left_margin, s.right_margin, s.top_margin, s.bottom_margin = (Cm(x) for x in MARGINS_CM)
+        s.header_distance = s.footer_distance = Cm(1.25)
+
+
+def align_kvek_signature(ps, label):
+    """КВЭК: пробелы и табуляции между должностью и чертой — одна табуляция SIGN_TAB_CM; «(подпись)» в следующем
+    абзаце — по табуляции под серединой черты. Иначе при полях по ГОСТ ФИО переносится на новую строку."""
+    p = find(ps, label)
+    t = p.text
+    nl = t.index('\n') + 1
+    a = nl + re.search(r'\t| {2,}', t[nl:]).start()
+    replace_span(p, a, t.index('_', a), '\t')
+    p.paragraph_format.tab_stops.add_tab_stop(Cm(KVEK_SIGN_TAB_CM))
+    cap = ps[ps.index(p) + 1]
+    if '(подпись)' in cap.text:
+        replace_span(cap, 0, cap.text.index('('), '\t')
+        cap.paragraph_format.tab_stops.add_tab_stop(Cm(KVEK_SIGN_TAB_CM + 1.0))
+
+
+def keep_block(ps, first, last):
+    """Абзацы ps[first..last] держатся на одной странице: подписи не уходят одни на следующий лист."""
+    for p in ps[first:last + 1]:
+        p.paragraph_format.keep_together = True
+        if p is not ps[last]:
+            p.paragraph_format.keep_with_next = True
+
+
+def align_signature(p, label_end=None):
+    """Строка подписи ОП: «метка:⇥____ ФИО» с одной табуляцией SIGN_TAB_CM вместо табуляций по умолчанию, пробелов
+    и большого левого отступа, которые при других полях переносят ФИО на новую строку."""
+    t = p.text
+    u = t.index('_')
+    a = 0 if label_end is None else t.index(':') + 1
+    replace_span(p, a, u, '\t') if u > a else p.runs[0].__setattr__('text', '\t' + p.runs[0].text)
+    p.paragraph_format.left_indent = Cm(0)
+    p.paragraph_format.tab_stops.add_tab_stop(Cm(SIGN_TAB_CM))
 
 
 def paragraphs(d):
@@ -261,6 +307,13 @@ def fill_kvek(f, out):
     set_role(find(ps, 'Эксперт:'), *EXPERT)
     set_role(find(ps, 'Исполнитель:'), *f['исполнитель'])
     set_role(find(ps, 'СОГЛАСОВАНО:'), *head)
+    for label in ('Эксперт:', 'Исполнитель:', 'СОГЛАСОВАНО:'):
+        align_kvek_signature(ps, label)
+    allp = d.paragraphs
+    z = next(i for i, p in enumerate(allp) if p.text.startswith('Заключение:'))
+    last = max(i for i, p in enumerate(allp) if p.text.strip())
+    keep_block(allp, z, last)
+    set_margins(d)
     path = Path(out) / f'КВЭК_{f["файл"]}.docx'
     d.save(path)
     return path
@@ -291,6 +344,16 @@ def fill_op(f, out):
     for p, name in zip((find(ps, 'Председатель экспертной комиссии'), members, ps[ps.index(members) + 1]),
                        COMMISSION_SIGN):
         set_signer(p, name)
+    chair = find(ps, 'Председатель экспертной комиссии')
+    align_signature(chair, label_end=True)
+    align_signature(members, label_end=True)
+    align_signature(ps[ps.index(members) + 1])
+    allp = d.paragraphs
+    i_chair = next(i for i, p in enumerate(allp) if p._p is chair._p)
+    prev = max(i for i in range(i_chair) if allp[i].text.strip())
+    last = max(i for i, p in enumerate(allp) if p.text.strip())
+    keep_block(allp, prev, last)
+    set_margins(d)
     path = Path(out) / f'ОП_{f["файл"]}.docx'
     d.save(path)
     return path
@@ -320,6 +383,7 @@ def selfcheck():
             assert s in kt, s
         assert 'не содержится/содержится' not in kt and 'не требуется/требуется' not in kt
         assert FIO not in kt and 'должность' not in kt, 'все подписанты КВЭК вписаны'
+        assert round(kd.sections[0].bottom_margin.cm, 2) == MARGINS_CM[3], 'поля по ГОСТ'
         try:
             fill_kvek(dict(f, подразделение='Инжиниринговый центр'), td)
             raise AssertionError('подача не от ЛМСТ без «согласовано» должна давать ошибку')
