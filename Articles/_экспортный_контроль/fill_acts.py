@@ -90,18 +90,32 @@ def align_kvek_signature(ps, label):
 
 
 def align_approve(ps):
-    """ОП: абзацы блока «УТВЕРЖДАЮ» до «ЗАКЛЮЧЕНИЕ» — по правому краю, без ведущих пробелов и отступов шаблона,
-    иначе при полях по ГОСТ строка даты переносится."""
+    """ОП: шапка как в образце автора (12.10.2026) — по правому краю без пустых строк: «УТВЕРЖДАЮ», черта подписи
+    с двумя табуляциями, дата; перед «ЗАКЛЮЧЕНИЕ» одна пустая строка."""
+    head = []
     for p in ps:
         if p.text.strip().startswith('ЗАКЛЮЧЕНИЕ'):
             break
+        head.append(p)
+    for p in head:
+        if not p.text.strip():
+            p._p.getparent().remove(p._p)
+            continue
         n = len(p.text) - len(p.text.lstrip(' '))
         if n:
             replace_span(p, 0, n, '')
+        if set(p.text.strip()) == {'_'}:
+            replace_span(p, 0, len(p.text), '_' * 17 + '		')
         pf = p.paragraph_format
         pf.left_indent = pf.first_line_indent = Cm(0)
+        pf.space_before = pf.space_after = Cm(0)
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-
+    date = [p for p in head if p.text.strip() and '202' in p.text][-1]
+    blank = copy.deepcopy(date._p)
+    for r in list(blank):
+        if r.tag != qn('w:pPr'):
+            blank.remove(r)
+    date._p.addnext(blank)
 
 def keep_block(ps, first, last):
     """Абзацы ps[first..last] держатся на одной странице: подписи не уходят одни на следующий лист."""
