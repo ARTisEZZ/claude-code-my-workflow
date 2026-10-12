@@ -48,6 +48,7 @@ import docx
 from docx.oxml.ns import qn
 from docx.shared import Cm
 from docx.text.paragraph import Paragraph
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 HERE = Path(__file__).resolve().parent
 T_KVEK = HERE / 'АКТ КВЭК (шаблон).docx'
@@ -86,6 +87,20 @@ def align_kvek_signature(ps, label):
     if '(подпись)' in cap.text:
         replace_span(cap, 0, cap.text.index('('), '\t')
         cap.paragraph_format.tab_stops.add_tab_stop(Cm(KVEK_SIGN_TAB_CM + 1.0))
+
+
+def align_approve(ps):
+    """ОП: абзацы блока «УТВЕРЖДАЮ» до «ЗАКЛЮЧЕНИЕ» — по правому краю, без ведущих пробелов и отступов шаблона,
+    иначе при полях по ГОСТ строка даты переносится."""
+    for p in ps:
+        if p.text.strip().startswith('ЗАКЛЮЧЕНИЕ'):
+            break
+        n = len(p.text) - len(p.text.lstrip(' '))
+        if n:
+            replace_span(p, 0, n, '')
+        pf = p.paragraph_format
+        pf.left_indent = pf.first_line_indent = Cm(0)
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
 
 def keep_block(ps, first, last):
@@ -353,6 +368,7 @@ def fill_op(f, out):
     prev = max(i for i in range(i_chair) if allp[i].text.strip())
     last = max(i for i, p in enumerate(allp) if p.text.strip())
     keep_block(allp, prev, last)
+    align_approve(d.paragraphs)
     set_margins(d)
     path = Path(out) / f'ОП_{f["файл"]}.docx'
     d.save(path)
